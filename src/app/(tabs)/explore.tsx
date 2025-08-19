@@ -1,14 +1,13 @@
 import React, { useMemo } from 'react';
-import { View, FlatList } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Card } from '../../components/Card';
-import { H1, Body, H3, Caption } from '../../components/Typography';
-import { Button } from '../../components/Button';
-import { EmojiReactionBar } from '../../components/EmojiReactionBar';
-import { db, Note, Comment } from '../../lib/instant';
-import { Reaction, getTotalReactionCount } from '../../lib/reactions';
-import { getTimeRemaining, getShortTimeRemaining } from '../../lib/timeUtils';
+import { FlashList } from '@shopify/flash-list';
+import { H1, Body, Caption } from '../../components/Typography';
+import { db, Note } from '../../lib/instant';
+import { Reaction } from '../../lib/reactions';
+import { NoteListItem } from '../../components/NoteListItem';
+import { useVisitedStore } from '../../state/visited';
 
 export default function ExploreScreen() {
   const { user } = db.useAuth();
@@ -26,15 +25,20 @@ export default function ExploreScreen() {
     return data.notes.filter((note: any) => note.authorId !== user.id);
   }, [data?.notes, user?.id]);
 
-  const notes = otherUsersNotes;
-  const comments = data?.comments || [];
+  // Sort newest first by createdAt desc
+  const notes = useMemo(() => {
+    const arr = [...otherUsersNotes];
+    arr.sort((a: any, b: any) => (b?.createdAt ?? 0) - (a?.createdAt ?? 0));
+    return arr;
+  }, [otherUsersNotes]);
+
   const reactions = (data?.reactions || []) as Reaction[];
 
-  const getCommentsForNote = (noteId: string) => {
-    return comments.filter((comment: Comment) => comment.noteId === noteId);
-  };
+  const isVisitedFn = useVisitedStore((s) => s.isVisited);
+  const markVisited = useVisitedStore((s) => s.markVisited);
 
   const handleViewNote = (noteId: string) => {
+    markVisited(noteId);
     router.push(`/note-detail?id=${noteId}`);
   };
 
@@ -58,109 +62,43 @@ export default function ExploreScreen() {
     );
   }
 
-  const renderNote = ({ item }: { item: Note }) => {
-    const noteComments = getCommentsForNote(item.id);
-    const timeInfo = getTimeRemaining(item.unlockAt);
-    const totalReactions = getTotalReactionCount(item.id, reactions);
-    
-    return (
-      <Card style={{ 
-        marginBottom: 16, 
-        padding: 16,
-        backgroundColor: timeInfo.isLocked ? '#fef7f7' : '#f7fef7',
-        borderWidth: 1,
-        borderColor: timeInfo.isLocked ? '#fecaca' : '#bbf7d0'
-      }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-          <H3 style={{ flex: 1 }}>Anonymous Note</H3>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Caption style={{ color: '#666', marginBottom: 4 }}>
-              {new Date(item.createdAt).toLocaleDateString()}
-            </Caption>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              borderRadius: 12,
-              backgroundColor: timeInfo.isLocked ? '#fecaca' : '#bbf7d0'
-            }}>
-              <Caption style={{ 
-                color: timeInfo.isLocked ? '#dc2626' : '#16a34a',
-                fontSize: 10,
-                fontWeight: '600'
-              }}>
-                {getShortTimeRemaining(item.unlockAt)}
-              </Caption>
-            </View>
-          </View>
-        </View>
-        
-        <View style={{ 
-          backgroundColor: '#fff', 
-          padding: 16, 
-          borderRadius: 8,
-          marginBottom: 12,
-          borderWidth: 1,
-          borderColor: timeInfo.isLocked ? '#fecaca' : '#bbf7d0'
-        }}>
-          <Body>{item.content}</Body>
-        </View>
-
-        <EmojiReactionBar 
-          noteId={item.id} 
-          reactions={reactions}
-          onReactionChange={() => {
-            // Trigger a re-render by updating state
-            // The useQuery will automatically update
-          }}
-        />
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {totalReactions > 0 && (
-              <Caption style={{ color: '#666' }}>
-                {totalReactions} reaction{totalReactions !== 1 ? 's' : ''}
-              </Caption>
-            )}
-            <Caption style={{ color: '#666' }}>
-              {noteComments.length} comment{noteComments.length !== 1 ? 's' : ''}
-            </Caption>
-          </View>
-          <Button
-            title="View Details"
-            variant="outline"
-            size="sm"
-            onPress={() => handleViewNote(item.id)}
-          />
-        </View>
-      </Card>
-    );
-  };
+  const renderItem = ({ item }: { item: Note }) => (
+    <NoteListItem
+      id={item.id}
+      createdAt={item.createdAt}
+      unlockAt={item.unlockAt}
+      content={item.content}
+      reactions={reactions}
+      isVisited={isVisitedFn(item.id)}
+      onPress={() => handleViewNote(item.id)}
+    />
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
       <View style={{ flex: 1 }}>
-        <H1 style={{ textAlign: 'center', marginBottom: 20, marginTop: 16, paddingHorizontal: 16 }}>
-          Explore Notes
-        </H1>
-        
-        {notes.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
-            <Body style={{ textAlign: 'center', color: '#666' }}>
-              No notes from other users yet.{'\n'}
-              Check back later to see what others are sharing!
-            </Body>
-          </View>
-        ) : (
-          <FlatList
+          <H1 style={{ textAlign: 'center', marginBottom: 4, marginTop: 16, paddingHorizontal: 16 }}>
+            Explore
+          </H1>
+          <Caption align="center" style={{ marginBottom: 12 }}>Newest first</Caption>
+          
+          {notes.length === 0 ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
+              <Body style={{ textAlign: 'center', color: '#666' }}>
+                No notes from other users yet.{'\n'}
+                Check back later to see what others are sharing!
+              </Body>
+            </View>
+          ) : (
+          <FlashList
             data={notes}
-            renderItem={renderNote}
-            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            keyExtractor={(item: Note) => item.id}
+            estimatedItemSize={150}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
           />
-        )}
+          )}
       </View>
     </SafeAreaView>
   );

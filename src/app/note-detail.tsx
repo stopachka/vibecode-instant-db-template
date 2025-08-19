@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -9,11 +9,14 @@ import { EmojiReactionBar } from '../components/EmojiReactionBar';
 import { db, Note, Comment } from '../lib/instant';
 import { Reaction, getTotalReactionCount } from '../lib/reactions';
 import { getTimeRemaining, getShortTimeRemaining } from '../lib/timeUtils';
+import { useVisitedStore } from '../state/visited';
 
 export default function NoteDetailScreen() {
   const params = useLocalSearchParams();
   const noteId = typeof params.id === 'string' ? params.id : params.id?.[0];
   
+  const markVisited = useVisitedStore((s) => s.markVisited);
+
   // Query all data including the specific note
   const { isLoading, error, data } = db.useQuery({
     notes: {},
@@ -26,6 +29,12 @@ export default function NoteDetailScreen() {
     if (!data?.notes || !noteId) return null;
     return data.notes.find((n: Note) => n.id === noteId);
   }, [data?.notes, noteId]);
+
+  useEffect(() => {
+    if (noteId) {
+      markVisited(noteId);
+    }
+  }, [noteId, markVisited]);
 
   const comments = (data?.comments || []) as Comment[];
   const reactions = (data?.reactions || []) as Reaction[];

@@ -16,6 +16,16 @@ export interface ReactionCounts {
   [emoji: string]: number;
 }
 
+export function getTopEmojiCounts(noteId: string, allReactions: Reaction[], topN: number = 3): Array<{ emoji: EmojiType; count: number }> {
+  const counts: Record<string, number> = {};
+  allReactions
+    .filter(r => r.noteId === noteId)
+    .forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; });
+  const entries = Object.entries(counts) as Array<[EmojiType, number]>;
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries.slice(0, topN).map(([emoji, count]) => ({ emoji, count }));
+}
+
 /**
  * Adds a reaction to a note
  */
