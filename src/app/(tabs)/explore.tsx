@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, FlatList, TextInput, Alert, Modal, Pressable } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { View, FlatList, TextInput, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../components/Card';
 import { H1, Body, H3, Caption } from '../../components/Typography';
@@ -12,12 +12,15 @@ export default function ExploreScreen() {
   const [anonymousName, setAnonymousName] = useState<string>('');
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
 
-  const { isLoading, error, data } = db.useQuery({
+  const cutoff = useRef<number>(Date.now()).current;
+  const query = useMemo(() => ({
     notes: {
-      $: { where: { unlockAt: { $lt: Date.now() } } } // Only show unlocked notes
+      $: { where: { unlockAt: { $lt: cutoff } } }
     },
     comments: {}
-  });
+  }), [cutoff]);
+
+  const { isLoading, error, data } = db.useQuery(query);
 
   const handleAddComment = async () => {
     if (!selectedNote || !commentText.trim()) {

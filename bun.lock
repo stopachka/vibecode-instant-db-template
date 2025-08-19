@@ -8,6 +8,7 @@
         "@expo/react-native-action-sheet": "^4.1.1",
         "@expo/ui": "~0.1.1-alpha.10",
         "@expo/vector-icons": "^14.1.0",
+        "@instantdb/react-native": "^0.21.0",
         "@react-native-async-storage/async-storage": "2.1.2",
         "@react-native-clipboard/clipboard": "^1.16.2",
         "@react-native-community/datetimepicker": "8.4.1",
@@ -413,6 +414,14 @@
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
     "@ide/backoff": ["@ide/backoff@1.0.0", "", {}, "sha512-F0YfUDjvT+Mtt/R4xdl2X0EYCHMMiJqNLdxHD++jDT5ydEFIyqbCHh51Qx2E211dgZprPKhV7sHmnXKpLuvc5g=="],
+
+    "@instantdb/core": ["@instantdb/core@0.21.0", "", { "dependencies": { "@instantdb/version": "v0.21.0", "mutative": "^1.0.10", "uuid": "^11.1.0" } }, "sha512-5t0JPc4I/agDTUkZwoluDghPtlPlJszQmrOtv7RRQd5xeMJSmVnAZmHd+KmGNQEUqA8bOOQrKzkSy7Vo3W6P8w=="],
+
+    "@instantdb/react": ["@instantdb/react@0.21.0", "", { "dependencies": { "@instantdb/core": "v0.21.0", "@instantdb/version": "v0.21.0" }, "peerDependencies": { "react": ">=16" } }, "sha512-3YFZoLi07PvqhLAOoPxf7+OkliPmv1/vB7PNky8wC8L9Un5dLSMTflrDBbNAr6gV7v6JPPpWh2Sq+ORPoRAzIQ=="],
+
+    "@instantdb/react-native": ["@instantdb/react-native@0.21.0", "", { "dependencies": { "@instantdb/core": "v0.21.0", "@instantdb/react": "v0.21.0", "@instantdb/version": "v0.21.0" }, "peerDependencies": { "@react-native-async-storage/async-storage": ">=1.15", "@react-native-community/netinfo": ">=7.1", "react": ">=16", "react-native": ">=0.56", "react-native-get-random-values": ">=1.5" } }, "sha512-SiSByjiRy46Hk8PYOXDGUHamVWJ7a8bVezXgPIdHqi54T0QqQ27r64nsp1eZUv7sRXVjwaKDoDrB0tFXyQ5AAw=="],
+
+    "@instantdb/version": ["@instantdb/version@0.21.0", "", {}, "sha512-52kOADySNaG4E6lcg6NiJHR8CqcotRadgTQhr58/jfg4JT53+YfI6Ue60WAL661Eqi3O/c2bzlLF1eXedF/K8g=="],
 
     "@isaacs/cliui": ["@isaacs/cliui@8.0.2", "", { "dependencies": { "string-width": "^5.1.2", "string-width-cjs": "npm:string-width@^4.2.0", "strip-ansi": "^7.0.1", "strip-ansi-cjs": "npm:strip-ansi@^6.0.1", "wrap-ansi": "^8.1.0", "wrap-ansi-cjs": "npm:wrap-ansi@^7.0.0" } }, "sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA=="],
 
@@ -1635,6 +1644,8 @@
     "mkdirp": ["mkdirp@3.0.1", "", { "bin": "dist/cjs/src/bin.js" }, "sha512-+NsyUUAZDmo6YVHzL/stxSu3t9YS1iljliy3BSDrXJ/dkn1KYdmtZODGGjLcc9XLgVVpH4KshHB8XmZgMhaBXg=="],
 
     "ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
+
+    "mutative": ["mutative@1.2.0", "", {}, "sha512-1muFw45Lwjso6TSBGiXfbjKS01fVSD/qaqBfTo/gXgp79e8KM4Sa1XP/S4iN2/DvSdIZgjFJI+JIhC7eKf3GTg=="],
 
     "mz": ["mz@2.7.0", "", { "dependencies": { "any-promise": "^1.0.0", "object-assign": "^4.0.1", "thenify-all": "^1.0.0" } }, "sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q=="],
 
