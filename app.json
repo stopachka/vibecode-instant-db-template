@@ -1,0 +1,80 @@
+{
+  "expo": {
+    "name": "vibecode-app-next",
+    "slug": "vibecode-app-next",
+    "scheme": "vibecode",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bidah.vibecode-app-next"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser",
+      "expo-build-properties",
+      "expo-mail-composer",
+      "expo-secure-store",
+      "expo-sqlite",
+      // [
+      //   "expo-calendar",
+      //   {
+      //     "calendarPermission": "Allow VibeCode to access your calendar. This will be used testing features that require calendar access. For example, you can create and display events in your calendar.",
+      //     "remindersPermission": "Allow VibeCode to access your reminders. This will be used testing features that require reminders access. For example, you can create and display reminders in your reminders list."
+      //   }
+      // ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow VibeCode to access your contacts. This will be used testing features that require contacts. For example, you can pick and display a contact from your address book."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow VibeCode to access your device motion. This will be used testing features that require motion. For example, you can use the device's motion sensors to detect when the user is shaking their device."
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Allow VibeCode to access your camera. This will be used testing features that require camera access. For example, you can use the camera to take a photo and save it to your photo library.",
+          "microphonePermissionText": "Allow VibeCode to access your microphone. This will be used testing features that require microphone access. For example, you can use the microphone to record audio and play it back."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow VibeCode to use your location. This will be used for development feature testing. The preview will show your current latitude and longitude for testing purposes."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow VibeCode to access your photos. This will be used for development feature testing.",
+          "savePhotosPermission": "Allow VibeCode to save photos. This will be used for development feature testing.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "development": false,
+          "projectId": "ab3ad25f-6cf8-4216-97f2-d4afe13c645b"
+        }
+      ]
+    ]
+  }
+}
