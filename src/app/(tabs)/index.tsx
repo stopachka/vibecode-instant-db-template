@@ -9,6 +9,7 @@ import { db, id } from '../../lib/instant';
 export default function CreateNoteScreen() {
   const [noteContent, setNoteContent] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const user = db.useUser();
 
   const handleCreateNote = async () => {
     if (!noteContent.trim()) {
@@ -27,7 +28,7 @@ export default function CreateNoteScreen() {
           content: noteContent.trim(),
           createdAt: now,
           unlockAt: unlockDate,
-          authorId: 'anonymous', // For now, using anonymous
+          authorId: user?.id || 'anonymous',
           isAnonymous: false,
         })
       );

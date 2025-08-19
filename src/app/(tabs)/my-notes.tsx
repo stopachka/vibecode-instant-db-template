@@ -6,9 +6,10 @@ import { H1, Body, H3, Caption } from '../../components/Typography';
 import { db, Note } from '../../lib/instant';
 
 export default function MyNotesScreen() {
+  const user = db.useUser();
   const { isLoading, error, data } = db.useQuery({
     notes: {
-      $: { where: { authorId: 'anonymous' } } // For now using anonymous
+      $: { where: { authorId: user?.id || '' } }
     }
   });
 

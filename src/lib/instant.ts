@@ -1,5 +1,5 @@
 // @ts-ignore
-import { init, i, InstaQLEntity, id } from '@instantdb/react-native';
+import { init, i, id } from '@instantdb/react-native';
 
 const APP_ID = 'e7b0f553-e8ea-43e0-b602-aca8b34c9826';
 
@@ -8,9 +8,9 @@ const schema = i.schema({
   entities: {
     notes: i.entity({
       content: i.string(),
-      createdAt: i.number(),
-      unlockAt: i.number(),
-      authorId: i.string(),
+      createdAt: i.number().indexed(),
+      unlockAt: i.number().indexed(),
+      authorId: i.string().indexed(),
       isAnonymous: i.boolean().optional(),
     }),
     comments: i.entity({
@@ -22,8 +22,8 @@ const schema = i.schema({
   },
 });
 
-export type Note = InstaQLEntity<typeof schema, 'notes'>;
-export type Comment = InstaQLEntity<typeof schema, 'comments'>;
+export type Note = any; // InstaQLEntity<typeof schema, 'notes'>;
+export type Comment = any; // InstaQLEntity<typeof schema, 'comments'>;
 
 export const db = init({ appId: APP_ID, schema });
 export { id };
