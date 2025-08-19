@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { EmojiReactionBar } from '../../components/EmojiReactionBar';
 import { db, Note, Comment, id } from '../../lib/instant';
 import { Reaction, getTotalReactionCount } from '../../lib/reactions';
+import { getTimeRemaining, getShortTimeRemaining } from '../../lib/timeUtils';
 
 export default function ExploreScreen() {
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -92,18 +93,16 @@ export default function ExploreScreen() {
 
   const renderNote = ({ item }: { item: Note }) => {
     const noteComments = getCommentsForNote(item.id);
-    const now = Date.now();
-    const isLocked = item.unlockAt > now;
-    const daysLeft = Math.ceil((item.unlockAt - now) / (1000 * 60 * 60 * 24));
+    const timeInfo = getTimeRemaining(item.unlockAt);
     const totalReactions = getTotalReactionCount(item.id, reactions);
     
     return (
       <Card style={{ 
         marginBottom: 16, 
         padding: 16,
-        backgroundColor: isLocked ? '#fef7f7' : '#f7fef7',
+        backgroundColor: timeInfo.isLocked ? '#fef7f7' : '#f7fef7',
         borderWidth: 1,
-        borderColor: isLocked ? '#fecaca' : '#bbf7d0'
+        borderColor: timeInfo.isLocked ? '#fecaca' : '#bbf7d0'
       }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <H3 style={{ flex: 1 }}>Anonymous Note</H3>
@@ -117,14 +116,14 @@ export default function ExploreScreen() {
               paddingHorizontal: 8,
               paddingVertical: 2,
               borderRadius: 12,
-              backgroundColor: isLocked ? '#fecaca' : '#bbf7d0'
+              backgroundColor: timeInfo.isLocked ? '#fecaca' : '#bbf7d0'
             }}>
               <Caption style={{ 
-                color: isLocked ? '#dc2626' : '#16a34a',
+                color: timeInfo.isLocked ? '#dc2626' : '#16a34a',
                 fontSize: 10,
                 fontWeight: '600'
               }}>
-                {isLocked ? `🔒 ${daysLeft} days left` : '🔓 Unlocked'}
+                {getShortTimeRemaining(item.unlockAt)}
               </Caption>
             </View>
           </View>
@@ -136,7 +135,7 @@ export default function ExploreScreen() {
           borderRadius: 8,
           marginBottom: 12,
           borderWidth: 1,
-          borderColor: isLocked ? '#fecaca' : '#bbf7d0'
+          borderColor: timeInfo.isLocked ? '#fecaca' : '#bbf7d0'
         }}>
           <Body>{item.content}</Body>
         </View>
@@ -174,13 +173,13 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
-      <View style={{ flex: 1, padding: 16 }}>
-        <H1 style={{ textAlign: 'center', marginBottom: 20 }}>
+      <View style={{ flex: 1 }}>
+        <H1 style={{ textAlign: 'center', marginBottom: 20, marginTop: 16, paddingHorizontal: 16 }}>
           Explore Notes
         </H1>
         
         {notes.length === 0 ? (
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16 }}>
             <Body style={{ textAlign: 'center', color: '#666' }}>
               No notes from other users yet.{'\n'}
               Check back later to see what others are sharing!
@@ -192,6 +191,7 @@ export default function ExploreScreen() {
             renderItem={renderNote}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
           />
         )}
       </View>
@@ -219,9 +219,9 @@ export default function ExploreScreen() {
                 <Card style={{ 
                   padding: 16, 
                   marginBottom: 20,
-                  backgroundColor: selectedNote.unlockAt > Date.now() ? '#fef7f7' : '#f7fef7',
+                  backgroundColor: getTimeRemaining(selectedNote.unlockAt).isLocked ? '#fef7f7' : '#f7fef7',
                   borderWidth: 1,
-                  borderColor: selectedNote.unlockAt > Date.now() ? '#fecaca' : '#bbf7d0'
+                  borderColor: getTimeRemaining(selectedNote.unlockAt).isLocked ? '#fecaca' : '#bbf7d0'
                 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                     <Caption style={{ color: '#666' }}>
@@ -233,17 +233,14 @@ export default function ExploreScreen() {
                       paddingHorizontal: 8,
                       paddingVertical: 2,
                       borderRadius: 12,
-                      backgroundColor: selectedNote.unlockAt > Date.now() ? '#fecaca' : '#bbf7d0'
+                      backgroundColor: getTimeRemaining(selectedNote.unlockAt).isLocked ? '#fecaca' : '#bbf7d0'
                     }}>
                       <Caption style={{ 
-                        color: selectedNote.unlockAt > Date.now() ? '#dc2626' : '#16a34a',
+                        color: getTimeRemaining(selectedNote.unlockAt).isLocked ? '#dc2626' : '#16a34a',
                         fontSize: 10,
                         fontWeight: '600'
                       }}>
-                        {selectedNote.unlockAt > Date.now() 
-                          ? `🔒 ${Math.ceil((selectedNote.unlockAt - Date.now()) / (1000 * 60 * 60 * 24))} days left`
-                          : '🔓 Unlocked'
-                        }
+                        {getShortTimeRemaining(selectedNote.unlockAt)}
                       </Caption>
                     </View>
                   </View>

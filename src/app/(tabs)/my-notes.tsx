@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../components/Card';
 import { H1, Body, H3, Caption } from '../../components/Typography';
 import { db, Note } from '../../lib/instant';
+import { getTimeRemaining } from '../../lib/timeUtils';
 
 export default function MyNotesScreen() {
   const { user } = db.useAuth();
@@ -34,20 +35,18 @@ export default function MyNotesScreen() {
   }
 
   const notes = data?.notes || [];
-  const now = Date.now();
 
   const renderNote = ({ item }: { item: Note }) => {
-    const isLocked = item.unlockAt > now;
-    const daysLeft = Math.ceil((item.unlockAt - now) / (1000 * 60 * 60 * 24));
+    const timeInfo = getTimeRemaining(item.unlockAt);
     
     return (
       <Card style={{ marginBottom: 16, padding: 16 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <H3 style={{ flex: 1 }}>
-            {isLocked ? 'Locked Note' : 'Unlocked Note'}
+            {timeInfo.isLocked ? 'Locked Note' : 'Unlocked Note'}
           </H3>
-          <Caption style={{ color: isLocked ? '#dc3545' : '#28a745' }}>
-            {isLocked ? `${daysLeft} days left` : 'Unlocked'}
+          <Caption style={{ color: timeInfo.isLocked ? '#dc3545' : '#28a745' }}>
+            {timeInfo.displayText}
           </Caption>
         </View>
         
@@ -55,7 +54,7 @@ export default function MyNotesScreen() {
           Created: {new Date(item.createdAt).toLocaleDateString()}
         </Caption>
         
-        {isLocked ? (
+        {timeInfo.isLocked ? (
           <View style={{ 
             backgroundColor: '#f8f9fa', 
             padding: 16, 
