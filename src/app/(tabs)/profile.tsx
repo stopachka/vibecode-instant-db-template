@@ -8,7 +8,7 @@ import { db } from '../../lib/instant';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
-  const user = db.useUser();
+  const { user } = db.useAuth();
   const { data: notesData } = db.useQuery({
     notes: {
       $: { where: { authorId: user?.id || '' } }
@@ -37,6 +37,16 @@ export default function ProfileScreen() {
       ]
     );
   };
+
+  if (!user) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Body>Loading...</Body>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>

@@ -9,7 +9,7 @@ import { db, id } from '../../lib/instant';
 export default function CreateNoteScreen() {
   const [noteContent, setNoteContent] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const user = db.useUser();
+  const { user } = db.useAuth();
 
   const handleCreateNote = async () => {
     if (!noteContent.trim()) {
