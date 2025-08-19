@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, TextInput, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { TextInput } from '../../components/TextInput';
 import { H1, Body, H3, Caption } from '../../components/Typography';
 import { db, id } from '../../lib/instant';
 
@@ -71,14 +72,8 @@ export default function CreateNoteScreen() {
               <TextInput
                 style={{
                   flex: 1,
-                  textAlignVertical: 'top',
-                  fontSize: 16,
-                  lineHeight: 24,
-                  padding: 12,
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: '#e9ecef',
+                }}
+                textStyle={{
                   minHeight: 200,
                 }}
                 multiline
@@ -86,12 +81,11 @@ export default function CreateNoteScreen() {
                 value={noteContent}
                 onChangeText={setNoteContent}
                 maxLength={2000}
+                showCharacterCount={true}
+                autoFocus={true}
               />
               
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-                <Caption style={{ color: '#666' }}>
-                  {noteContent.length}/2000 characters
-                </Caption>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 12 }}>
                 <Caption style={{ color: '#666' }}>
                   Unlocks in 30 days
                 </Caption>
