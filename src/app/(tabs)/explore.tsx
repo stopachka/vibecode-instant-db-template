@@ -12,15 +12,18 @@ export default function ExploreScreen() {
   const [anonymousName, setAnonymousName] = useState<string>('');
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
 
-  const cutoff = useRef<number>(Date.now()).current;
-  const query = useMemo(() => ({
-    notes: {
-      $: { where: { unlockAt: { $lt: cutoff } } }
-    },
+  // Simple query without comparison operators to avoid index requirement
+  const { isLoading, error, data } = db.useQuery({
+    notes: {},
     comments: {}
-  }), [cutoff]);
-
-  const { isLoading, error, data } = db.useQuery(query);
+  });
+  
+  // Filter unlocked notes client-side
+  const now = Date.now();
+  const unlockedNotes = useMemo(() => {
+    if (!data?.notes) return [];
+    return data.notes.filter((note: any) => note.unlockAt <= now);
+  }, [data?.notes, now]);
 
   const handleAddComment = async () => {
     if (!selectedNote || !commentText.trim()) {
@@ -75,7 +78,7 @@ export default function ExploreScreen() {
     );
   }
 
-  const notes = data?.notes || [];
+  const notes = unlockedNotes;
   const comments = data?.comments || [];
 
   const getCommentsForNote = (noteId: string) => {
