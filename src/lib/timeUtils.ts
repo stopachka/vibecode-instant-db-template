@@ -26,14 +26,15 @@ export function getTimeRemaining(unlockAt: number): TimeRemaining {
     };
   }
   
-  // Calculate days and hours
-  const daysLeft = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-  const hoursLeft = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  // Calculate days and hours with ceil for days (so newer posts can show 30 days)
+  const DAY_MS = 1000 * 60 * 60 * 24;
+  const daysLeftCeil = Math.ceil(timeDiff / DAY_MS);
+  const hoursLeft = Math.floor((timeDiff % DAY_MS) / (1000 * 60 * 60));
   
   let displayText: string;
   
-  if (daysLeft > 0) {
-    displayText = `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`;
+  if (timeDiff >= DAY_MS) {
+    displayText = `${daysLeftCeil} day${daysLeftCeil !== 1 ? 's' : ''} left`;
   } else if (hoursLeft > 0) {
     displayText = `${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''} left`;
   } else {
@@ -48,7 +49,7 @@ export function getTimeRemaining(unlockAt: number): TimeRemaining {
   return {
     isLocked: true,
     displayText,
-    daysLeft,
+    daysLeft: daysLeftCeil,
     hoursLeft,
   };
 }
