@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, FlatList } from 'react-native';
+import { View, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../components/Card';
 import { H1, Body, H3, Caption } from '../../components/Typography';

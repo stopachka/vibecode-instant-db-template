@@ -1,10 +1,12 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, FlatList, TextInput, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '../../components/Card';
 import { H1, Body, H3, Caption } from '../../components/Typography';
 import { Button } from '../../components/Button';
+import { EmojiReactionBar } from '../../components/EmojiReactionBar';
 import { db, Note, Comment, id } from '../../lib/instant';
+import { Reaction, getTotalReactionCount } from '../../lib/reactions';
 
 export default function ExploreScreen() {
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -12,18 +14,20 @@ export default function ExploreScreen() {
   const [anonymousName, setAnonymousName] = useState<string>('');
   const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
 
-  // Simple query without comparison operators to avoid index requirement
+  const { user } = db.useAuth();
+  
+  // Query all data including reactions
   const { isLoading, error, data } = db.useQuery({
     notes: {},
-    comments: {}
+    comments: {},
+    reactions: {}
   });
   
-  // Filter unlocked notes client-side
-  const now = Date.now();
-  const unlockedNotes = useMemo(() => {
-    if (!data?.notes) return [];
-    return data.notes.filter((note: any) => note.unlockAt <= now);
-  }, [data?.notes, now]);
+  // Filter to show all notes from other users (both locked and unlocked)
+  const otherUsersNotes = useMemo(() => {
+    if (!data?.notes || !user?.id) return [];
+    return data.notes.filter((note: any) => note.authorId !== user.id);
+  }, [data?.notes, user?.id]);
 
   const handleAddComment = async () => {
     if (!selectedNote || !commentText.trim()) {
@@ -78,8 +82,9 @@ export default function ExploreScreen() {
     );
   }
 
-  const notes = unlockedNotes;
+  const notes = otherUsersNotes;
   const comments = data?.comments || [];
+  const reactions = (data?.reactions || []) as Reaction[];
 
   const getCommentsForNote = (noteId: string) => {
     return comments.filter((comment: Comment) => comment.noteId === noteId);
@@ -87,29 +92,75 @@ export default function ExploreScreen() {
 
   const renderNote = ({ item }: { item: Note }) => {
     const noteComments = getCommentsForNote(item.id);
+    const now = Date.now();
+    const isLocked = item.unlockAt > now;
+    const daysLeft = Math.ceil((item.unlockAt - now) / (1000 * 60 * 60 * 24));
+    const totalReactions = getTotalReactionCount(item.id, reactions);
     
     return (
-      <Card style={{ marginBottom: 16, padding: 16 }}>
+      <Card style={{ 
+        marginBottom: 16, 
+        padding: 16,
+        backgroundColor: isLocked ? '#fef7f7' : '#f7fef7',
+        borderWidth: 1,
+        borderColor: isLocked ? '#fecaca' : '#bbf7d0'
+      }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <H3 style={{ flex: 1 }}>Anonymous Note</H3>
-          <Caption style={{ color: '#666' }}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Caption>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Caption style={{ color: '#666', marginBottom: 4 }}>
+              {new Date(item.createdAt).toLocaleDateString()}
+            </Caption>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 12,
+              backgroundColor: isLocked ? '#fecaca' : '#bbf7d0'
+            }}>
+              <Caption style={{ 
+                color: isLocked ? '#dc2626' : '#16a34a',
+                fontSize: 10,
+                fontWeight: '600'
+              }}>
+                {isLocked ? `🔒 ${daysLeft} days left` : '🔓 Unlocked'}
+              </Caption>
+            </View>
+          </View>
         </View>
         
         <View style={{ 
-          backgroundColor: '#f8f9fa', 
+          backgroundColor: '#fff', 
           padding: 16, 
           borderRadius: 8,
-          marginBottom: 12
+          marginBottom: 12,
+          borderWidth: 1,
+          borderColor: isLocked ? '#fecaca' : '#bbf7d0'
         }}>
           <Body>{item.content}</Body>
         </View>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Caption style={{ color: '#666' }}>
-            {noteComments.length} comment{noteComments.length !== 1 ? 's' : ''}
-          </Caption>
+        <EmojiReactionBar 
+          noteId={item.id} 
+          reactions={reactions}
+          onReactionChange={() => {
+            // Trigger a re-render by updating state
+            // The useQuery will automatically update
+          }}
+        />
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {totalReactions > 0 && (
+              <Caption style={{ color: '#666' }}>
+                {totalReactions} reaction{totalReactions !== 1 ? 's' : ''}
+              </Caption>
+            )}
+            <Caption style={{ color: '#666' }}>
+              {noteComments.length} comment{noteComments.length !== 1 ? 's' : ''}
+            </Caption>
+          </View>
           <Button
             title="View & Comment"
             variant="outline"
@@ -131,8 +182,8 @@ export default function ExploreScreen() {
         {notes.length === 0 ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Body style={{ textAlign: 'center', color: '#666' }}>
-              No unlocked notes available yet.{'\n'}
-              Check back later!
+              No notes from other users yet.{'\n'}
+              Check back later to see what others are sharing!
             </Body>
           </View>
         ) : (
@@ -165,11 +216,46 @@ export default function ExploreScreen() {
 
             {selectedNote && (
               <View style={{ flex: 1 }}>
-                <Card style={{ padding: 16, marginBottom: 20 }}>
-                  <Caption style={{ marginBottom: 8, color: '#666' }}>
-                    Posted: {new Date(selectedNote.createdAt).toLocaleDateString()}
-                  </Caption>
-                  <Body>{selectedNote.content}</Body>
+                <Card style={{ 
+                  padding: 16, 
+                  marginBottom: 20,
+                  backgroundColor: selectedNote.unlockAt > Date.now() ? '#fef7f7' : '#f7fef7',
+                  borderWidth: 1,
+                  borderColor: selectedNote.unlockAt > Date.now() ? '#fecaca' : '#bbf7d0'
+                }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <Caption style={{ color: '#666' }}>
+                      Posted: {new Date(selectedNote.createdAt).toLocaleDateString()}
+                    </Caption>
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 12,
+                      backgroundColor: selectedNote.unlockAt > Date.now() ? '#fecaca' : '#bbf7d0'
+                    }}>
+                      <Caption style={{ 
+                        color: selectedNote.unlockAt > Date.now() ? '#dc2626' : '#16a34a',
+                        fontSize: 10,
+                        fontWeight: '600'
+                      }}>
+                        {selectedNote.unlockAt > Date.now() 
+                          ? `🔒 ${Math.ceil((selectedNote.unlockAt - Date.now()) / (1000 * 60 * 60 * 24))} days left`
+                          : '🔓 Unlocked'
+                        }
+                      </Caption>
+                    </View>
+                  </View>
+                  <Body style={{ marginBottom: 12 }}>{selectedNote.content}</Body>
+                  
+                  <EmojiReactionBar 
+                    noteId={selectedNote.id} 
+                    reactions={reactions}
+                    onReactionChange={() => {
+                      // Reactions will update automatically via useQuery
+                    }}
+                  />
                 </Card>
 
                 <H3 style={{ marginBottom: 12 }}>Comments</H3>

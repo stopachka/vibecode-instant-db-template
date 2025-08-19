@@ -42,7 +42,7 @@ const sizeStyles = {
   },
 };
 
-const getTextColor = (variant: ButtonVariant, disabled: boolean) => {
+const getTextColor = (variant: ButtonVariant) => {
   switch (variant) {
     case "primary":
     case "danger":
@@ -58,20 +58,7 @@ const getTextColor = (variant: ButtonVariant, disabled: boolean) => {
   }
 };
 
-const getLoadingColor = (variant: ButtonVariant): string => {
-  switch (variant) {
-    case "primary":
-      return theme.colors.primary;
-    case "danger":
-      return theme.colors.error;
-    case "secondary":
-    case "outline":
-    case "ghost":
-      return theme.colors.text;
-    default:
-      return theme.colors.primary;
-  }
-};
+
 
 const getButtonStyle = (variant: ButtonVariant): ViewStyle => {
   switch (variant) {
@@ -212,7 +199,7 @@ export const Button: React.FC<ButtonProps> = ({
             {icon && iconPosition === "left" && <View style={{ marginRight: 4 }}>{icon}</View>}
             <Text
               style={{
-                color: getTextColor(variant, disabled),
+                color: getTextColor(variant),
                 fontSize: sizeStyles[size].fontSize,
                 fontWeight: "600",
                 textAlign: "center",

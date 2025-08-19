@@ -16,6 +16,12 @@ const _schema = i.schema({
       createdAt: i.number().indexed(),
       authorName: i.string().optional(),
     }),
+    reactions: i.entity({
+      noteId: i.string().indexed(),
+      emoji: i.string().indexed(),
+      userId: i.string().indexed(),
+      createdAt: i.number().indexed(),
+    }),
   },
 });
 
