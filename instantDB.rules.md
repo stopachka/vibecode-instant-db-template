@@ -1,1099 +1,143 @@
-# What is InstantDB
+You are an expert developer who writes full-stack react native apps in InstantDB and Expo. However InstantDB is not in your training set and you are not familiar with it.
 
-Backend-as-a-Service (BaaS) with optimistic updates, multiplayer, offline support, and relational data. Firebase alternative with relations.
+Before generating a new expo app you check to see if a next project already exists in the current directory. If it does you do not generate a new expo app.
 
-## Core Features
+Make sure the following expo packages are also installed:
 
-- Optimistic updates
-- Real-time multiplayer sync
-- Offline-first architecture
-- Relational data support
-- Web and mobile compatible
+- @react-native-async-storage/async-storage
+- @react-native-community/netinfo
+- react-native-get-random-values
+- react-native-safe-area-context
+- expo-image-picker
+- @instantdb/react-native
 
-## API
+If the Instant MCP is available use the tools to create apps and manage schema.
 
-CRITICAL: These are the only APIs from the react native package you need to know. do not hallucinate other APIs.
+# About InstantDB
+
+Instant is the Modern Firebase. With Instant you can easily build realtime and collaborative apps. You can get started for free at https://instantdb.com
+
+# How to use Instant in projects
+
+Instant offers client side javascript packages for vanilla JS, react, and react native. Instant also offers a javascript admin SDK that can be used on the backend.
+
+If you want to use Instant with react native you should only use `@instantdb/react-native`. For scripts or server environments you should only use the admin SDK `@instantdb/admin`. For other client-side frameworks or vanilla js you should only use `@instantdb/core`
+
+CRITICAL: To use the admin SDK you MUST get an admin token for the app. You can get the admin token with the MCP tool via `create-app`. The admin token is SENSITIVE and should be stored in an environment variable. Do not hardcode it in your script.
+
+CRITICAL: If you want to create seed data YOU MUST write a script that uses the admin SDK. DO NOT try to seed data on the client.
+
+CRITICAL: Here is a concise summary of the `where` operator map which defines all the filtering options you can use with InstantDB queries to narrow results based on field values, comparisons, arrays, text patterns, and logical conditions.
 
 ```
-// Initialization
-init<Schema>(config: InstantConfig<Schema>): InstantReactNativeDatabase<Schema>
+Equality:        { field: value }
 
-// Transaction builder
-tx: TxChunk<Schema>
-id(): string
-lookup(attribute: string, value: any): Lookup
+Inequality:      { field: { $ne: value } }
 
-// Schema builder
-i.schema({ entities, links?, rooms? })
-i.entity(attrs)
-i.string(), i.number(), i.boolean(), i.date(), i.json(), i.any()
+Null checks:     { field: { $isNull: true | false } }
 
-// Core Database Methods (on db instance)
-db.transact(chunks)
+Comparison:      $gt, $lt, $gte, $lte   (indexed + typed fields only)
 
-// React Hooks (on db instance)
-db.useQuery(query, opts?)
-db.useAuth()
-db.room(type?, id?)
+Sets:            { field: { $in: [v1, v2] } }
 
-// Auth Methods (on db.auth)
-db.auth.sendMagicCode({ email })
-db.auth.signInWithMagicCode({ email, code })
-db.auth.signOut(opts?)
+Substring:       { field: { $like: 'Get%' } }      // case-sensitive
+                  { field: { $ilike: '%get%' } }   // case-insensitive
 
-// Room Hooks (on db.rooms) - IMPORTANT: These are called on db.rooms, not on room instances
-db.rooms.useTopicEffect(room, topic, onEvent)
-db.rooms.usePublishTopic(room, topic) // returns: (data) => void
-db.rooms.usePresence(room, opts?) // returns: { peers, user, publishPresence, isLoading }
-db.rooms.useSyncPresence(room, data, deps?)
-db.rooms.useTypingIndicator(room, inputName, opts?) // returns: { active, setActive, inputProps }
+Logic:           and: [ {...}, {...} ]
+                  or:  [ {...}, {...} ]
 
-// Components
-<Cursors room={room} {...props} />
+Nested fields:   'relation.field': value
 ```
 
-# How to initialize DB
+CRITICAL: The operator map above is the full set of `where` filters Instant
+supports right now. There is no `$exists`, `$nin`, or `$regex`. And `$like` and
+`$ilike` are what you use for `startsWith` / `endsWith` / `includes`.
 
-Create a central DB instance (single connection maintained per app ID):
+CRITICAL: Pagination keys (`limit`, `offset`, `first`, `after`, `last`, `before`) only work on top-level namespaces. DO NOT use them on nested relations or else you will get an error.
+
+CRITICAL: If you are unsure how something works in InstantDB you fetch the relevant urls in the documentation to learn more.
+
+CRITICAL: Make sure to follow the rules of hooks.
+
+# Full Example App
+
+Below is a full demo app built with InstantDB, Expo with the following features:
+
+- Initiailizes a connection to InstantDB
+- Defines schema for the app
+- Authentication with magic codes
+- Reads and writes data via `db.useQuery` and `db.transact`
+- Ephemeral features like who's online and shout
+- File uploads for avatars
+
+Logic is split across four files:
+
+- `lib/db.ts` -- InstantDB client setup
+- `instant.schema.ts` - InstantDB schema, gives you type safety for your data!
+- 'app.config.ts' - Config for environment variables
+- `App.tsx` - Main logic, mostly UI with some Instant magic :)
 
 ```typescript
-// lib/db.ts
-import { init } from "@instantdb/react-native";
-import schema from "../instant.schema";
+/* FILE: src/lib/db.ts */
 
-export const db = init({
-  // Get your app ID from https://instantdb.com
-  appId: "your-app-id",
-  schema,
-});
-```
+import { init } from '@instantdb/react-native';
+import schema from '../instant.schema';
 
-`init` accepts the following parameters:
+const db = init({ appId: APP_ID, schema });
 
-```typescript
-export type InstantConfig<S extends InstantSchemaDef<any, any, any>> = {
-  appId: string;
-  schema?: S;
-};
-```
+export default db;
 
-# How to do queries
+/* FILE: src/instant.schema.ts */
+import { i } from '@instantdb/react-native';
 
-## Core Concepts
-
-- **Namespaces**: Entity collections (tables)
-- **Queries**: JS objects describing data needs
-- **Associations**: Entity relationships
-
-## Query Structure
-
-```typescript
-{
-  namespace1: {
-    $: { /* operators */ },
-    linkedNamespace: { $: { /* operators */ } }
+const _schema = i.schema({
+  entities: {
+    $files: i.entity({
+      path: i.string().unique().indexed(),
+      url: i.string(),
+    }),
+    $users: i.entity({
+      email: i.string().unique().indexed().optional(),
+    }),
+    profiles: i.entity({
+      handle: i.string(),
+    }),
+    posts: i.entity({
+      text: i.string(),
+      createdAt: i.number().indexed(),
+    }),
   },
-  namespace2: { /* ... */ }
-}
-```
-
-## Basic Usage
-
-**Required**: Handle `isLoading` and `error` states:
-
-```typescript
-const { isLoading, data, error } = db.useQuery({ todos: {} });
-if (isLoading) return;
-if (error) return <div>Error: {error.message}</div>;
-return <pre>{JSON.stringify(data, null, 2)}</pre>;
-```
-
-### Fetch Operations
-
-```typescript
-// Single namespace
-const query = { goals: {} };
-
-// Multiple namespaces
-const query = { goals: {}, todos: {} };
-```
-
-## Filtering
-
-### By ID
-
-```typescript
-const query = {
-  goals: {
-    $: { where: { id: "goal-1" } },
-  },
-};
-```
-
-### Multiple Conditions (AND)
-
-```typescript
-const query = {
-  todos: {
-    $: { where: { completed: true, priority: "high" } },
-  },
-};
-```
-
-## Associations (JOINs)
-
-### Fetch Related
-
-```typescript
-// Goals with todos
-const query = { goals: { todos: {} } };
-
-// Inverse: Todos with goals
-const query = { todos: { goals: {} } };
-```
-
-### Filter by Association
-
-```typescript
-// Dot notation for associated values
-const query = {
-  goals: {
-    $: { where: { "todos.title": "Go running" } },
-    todos: {},
-  },
-};
-```
-
-### Filter Associated Entities
-
-```typescript
-const query = {
-  goals: {
-    todos: {
-      $: { where: { completed: true } },
+  links: {
+    userProfiles: {
+      forward: { on: 'profiles', has: 'one', label: 'user' },
+      reverse: { on: '$users', has: 'one', label: 'profile' },
+    },
+    postAuthors: {
+      forward: { on: 'posts', has: 'one', label: 'author' },
+      reverse: { on: 'profiles', has: 'many', label: 'posts' },
+    },
+    profileAvatars: {
+      forward: { on: 'profiles', has: 'one', label: 'avatar' },
+      reverse: { on: '$files', has: 'one', label: 'profile' },
     },
   },
-};
-```
-
-## Operators
-
-### Logical
-
-```typescript
-// AND
-where: {
-  and: [{ "todos.priority": "high" }, { "todos.dueDate": { $lt: tomorrow } }];
-}
-
-// OR
-where: {
-  or: [{ priority: "high" }, { dueDate: { $lt: tomorrow } }];
-}
-```
-
-### Comparison (indexed fields only)
-
-- `$gt`, `$lt`, `$gte`, `$lte`
-
-```typescript
-where: {
-  timeEstimate: {
-    $gt: 2;
-  }
-}
-```
-
-### Other Operators
-
-```typescript
-// IN
-where: {
-  priority: {
-    $in: ["high", "critical"];
-  }
-}
-
-// NOT
-where: {
-  location: {
-    $not: "work";
-  }
-}
-
-// NULL check
-where: {
-  location: {
-    $isNull: true;
-  }
-}
-
-// Pattern matching (indexed strings)
-where: {
-  title: {
-    $like: "Get%";
-  }
-} // Case-sensitive
-where: {
-  title: {
-    $ilike: "get%";
-  }
-} // Case-insensitive
-```
-
-Pattern syntax:
-
-- `'prefix%'` - Starts with
-- `'%suffix'` - Ends with
-- `'%substring%'` - Contains
-
-## Pagination & Ordering
-
-### Pagination (top-level only)
-
-```typescript
-$: { limit: 10, offset: 10 }
-```
-
-### Ordering (indexed fields)
-
-```typescript
-$: {
-  order: {
-    dueDate: "asc";
-  }
-} // or 'desc'
-```
-
-## Field Selection
-
-```typescript
-// Select specific fields
-$: { fields: ['title', 'status'] }
-
-// With nested associations
-goals: {
-  $: { fields: ['title'] },
-  todos: { $: { fields: ['status'] } }
-}
-```
-
-## Deferred Queries
-
-```typescript
-const query = user ? { todos: { $: { where: { userId: user.id } } } } : null;
-```
-
-## Complex Example
-
-```typescript
-const query = {
-  goals: {
-    $: {
-      where: { or: [{ status: "active" }, { "todos.priority": "high" }] },
-      limit: 5,
-      order: { serverCreatedAt: "desc" },
-      fields: ["title", "description"],
-    },
+  rooms: {
     todos: {
-      $: {
-        where: { completed: false, dueDate: { $lt: nextWeek } },
-        fields: ["title", "dueDate"],
+      presence: i.entity({}),
+      topics: {
+        shout: i.entity({
+          text: i.string(),
+          x: i.number(),
+          y: i.number(),
+          angle: i.number(),
+          size: i.number(),
+        }),
       },
     },
   },
-};
-```
-
-## Best Practices
-
-1. Index fields for filtering/sorting/comparison
-2. Use field selection to minimize data transfer
-3. Defer queries when dependencies aren't ready
-4. Limit deep association nesting
-5. Use where/limit/pagination for large datasets
-
-## Common Errors
-
-- **"Field must be indexed"**: Add index in Explorer/schema
-- **"Invalid operator"**: Check syntax/spelling
-- **"Invalid query structure"**: Verify $ placement
-
-# How to do transactions
-
-## Core Concepts
-
-- **Transactions**: Atomic operation groups
-- **Transaction Chunks**: Individual operations
-- **Proxy Syntax**: `db.tx` object for creating chunks
-
-## Basic Structure
-
-```typescript
-db.transact(db.tx.NAMESPACE[ENTITY_ID].ACTION(DATA));
-```
-
-## Entity IDs
-
-### Generate with `id()`
-
-```typescript
-import { id } from "@instantdb/react-native";
-
-// New ID
-const newTodoId = id();
-db.transact(db.tx.todos[newTodoId].update({ text: "New todo" }));
-
-// Inline
-db.transact(db.tx.todos[id()].update({ text: "Another todo" }));
-```
-
-### Lookup by Unique Attributes
-
-```typescript
-import { lookup } from "@instantdb/react-native";
-
-// Schema must define unique attributes
-db.transact(
-  db.tx.profiles[lookup("handle", "nezaj")].update({
-    bio: "I like turtles",
-  })
-);
-```
-
-## Creating Entities
-
-Use `update` (not `create`):
-
-```typescript
-db.transact(
-  db.tx.todos[id()].update({
-    text: "Complex todo", // String
-    priority: 1, // Number
-    completed: false, // Boolean
-    tags: ["work", "important"], // Array
-    metadata: {
-      // Object
-      assignee: "user-123",
-      dueDate: "2025-01-15",
-    },
-  })
-);
-```
-
-## Updating Entities
-
-### Basic Update
-
-```typescript
-db.transact(db.tx.todos[todoId].update({ done: true }));
-```
-
-### Deep Merge (nested objects)
-
-```typescript
-// Preserves unspecified nested fields
-db.transact(
-  db.tx.profiles[userId].merge({
-    preferences: { theme: "dark" },
-  })
-);
-```
-
-### Remove Keys
-
-```typescript
-db.transact(
-  db.tx.profiles[userId].merge({
-    preferences: { notifications: null },
-  })
-);
-```
-
-## Deleting Entities
-
-```typescript
-// Single
-db.transact(db.tx.todos[todoId].delete());
-
-// Multiple
-db.transact([db.tx.todos[todoId1].delete(), db.tx.todos[todoId2].delete()]);
-
-// Conditional
-const completedTodos = data.todos.filter((todo) => todo.done);
-db.transact(completedTodos.map((todo) => db.tx.todos[todo.id].delete()));
-```
-
-## Relationships
-
-### Link Entities
-
-```typescript
-// Single link
-db.transact(db.tx.projects[projectId].link({ todos: todoId }));
-
-// Multiple links
-db.transact(
-  db.tx.projects[projectId].link({
-    todos: [todoId1, todoId2, todoId3],
-  })
-);
-
-// Bidirectional (equivalent)
-db.transact(db.tx.projects[projectId].link({ todos: todoId }));
-db.transact(db.tx.todos[todoId].link({ projects: projectId }));
-```
-
-### Unlink
-
-```typescript
-db.transact(db.tx.projects[projectId].unlink({ todos: todoId }));
-```
-
-### Link with Lookup
-
-```typescript
-db.transact(
-  db.tx.profiles[lookup("email", "user@example.com")].link({
-    projects: lookup("name", "Project Alpha"),
-  })
-);
-```
-
-## Advanced Operations
-
-### Combined Operations
-
-```typescript
-// Update + link
-db.transact(db.tx.todos[id()].update({ text: "New todo", done: false }).link({ projects: projectId }));
-
-// Multiple in transaction
-db.transact([db.tx.todos[todoId].update({ done: true }), db.tx.projects[projectId].update({ completedCount: 10 })]);
-```
-
-### Special Namespaces
-
-```typescript
-// Link to authenticated user ($users is system namespace)
-db.transact(db.tx.todos[todoId].link({ $users: auth.userId }));
-```
-
-## Performance
-
-### Batch Large Operations
-
-```typescript
-const batchSize = 100;
-const createManyTodos = async (count) => {
-  for (let i = 0; i < count; i += batchSize) {
-    const batch = [];
-    for (let j = 0; j < batchSize && i + j < count; j++) {
-      batch.push(
-        db.tx.todos[id()].update({
-          text: `Todo ${i + j}`,
-          done: false,
-        })
-      );
-    }
-    await db.transact(batch);
-  }
-};
-```
-
-## Common Patterns
-
-### Create-or-Update
-
-```typescript
-db.transact(
-  db.tx.profiles[lookup("email", "user@example.com")].update({
-    lastLoginAt: Date.now(),
-  })
-);
-```
-
-### Toggle Boolean
-
-```typescript
-const toggleTodo = (todo) => {
-  db.transact(db.tx.todos[todo.id].update({ done: !todo.done }));
-};
-```
-
-### Sequential Transactions
-
-```typescript
-const createProjectAndTasks = async (projectData) => {
-  const result = await db.transact(db.tx.projects[id()].update(projectData));
-  const projectId = result.ids.projects[0];
-  await db.transact(
-    db.tx.tasks[id()]
-      .update({
-        title: "Initial planning",
-      })
-      .link({ project: projectId })
-  );
-};
-```
-
-## Error Handling
-
-```typescript
-try {
-  await db.transact(/* ... */);
-} catch (error) {
-  console.error("Transaction failed:", error);
-}
-```
-
-## Important: Make sure to use `transact` inside a `useEffect` or event handler
-
-Do not use `transact` inside a component render. This will cause an error.
-
-```typescript
-// ❌ Wrong
-function MyComponent() {
-  // This will cause an error
-  db.transact(db.tx.todos[id()].update({ text: "New todo" }));
-  return <div>My component</div>;
-}
-
-// ✅ Correct
-function MyComponent() {
-  const handleClick = () => {
-    db.transact(db.tx.todos[id()].update({ text: "New todo" }));
-  };
-  return <button onClick={handleClick}>Create todo</button>;
-}
-```
-
-## Common Mistakes
-
-- Using non-UUID IDs (must use `id()` or `lookup()`)
-- Using `create` method (doesn't exist, use `update`)
-- Direct `$users` updates (link only)
-- Using `update` for nested objects (use `merge`)
-- Not batching large transactions
-- Using `lookup` on non-unique fields
-- Using `transact` in render (use `useEffect` or event handlers)
-
-# How to model data
-
-Schema is declared as code. System namespaces start with `$` (e.g., `$users`).
-
-## Core Concepts
-
-- **Namespaces**: Entity collections (tables)
-- **Attributes**: Entity properties with types
-- **Links**: Entity relationships
-- **Rooms**: Ephemeral namespaces (cursors, etc.)
-
-## Schema Setup
-
-```typescript
-// instant.schema.ts
-import { i } from "@instantdb/react-native";
-
-const _schema = i.schema({
-  entities: {
-    /* namespaces */
-  },
-  links: {
-    /* relationships */
-  },
-  rooms: {
-    /* ephemeral data */
-  },
 });
 
-type _AppSchema = typeof _schema;
-interface AppSchema extends _AppSchema {}
-const schema: AppSchema = _schema;
-
-export type { AppSchema };
-export default schema;
-```
-
-## Namespaces
-
-```typescript
-entities: {
-  profiles: i.entity({ /* attributes */ }),
-  posts: i.entity({ /* attributes */ }),
-  comments: i.entity({ /* attributes */ })
-}
-```
-
-Rules:
-
-- Alphanumeric + underscores
-- No spaces
-- Unique names
-- No `$` prefix (reserved)
-
-## Attributes
-
-### Types
-
-| Type          | Description    | Example                    |
-| ------------- | -------------- | -------------------------- |
-| `i.string()`  | Text           | `title: i.string()`        |
-| `i.number()`  | Numeric        | `viewCount: i.number()`    |
-| `i.boolean()` | True/false     | `isPublished: i.boolean()` |
-| `i.date()`    | Date/time      | `publishedAt: i.date()`    |
-| `i.json()`    | Nested objects | `metadata: i.json()`       |
-| `i.any()`     | Untyped        | `miscData: i.any()`        |
-
-### Constraints & Performance
-
-```typescript
-posts: i.entity({
-  slug: i.string().unique(), // Unique + auto-indexed
-  title: i.string(),
-  category: i.string().indexed(), // Indexed for queries
-  publishedAt: i.date().indexed(),
-});
-```
-
-## Links (Relationships)
-
-### Basic Structure
-
-```typescript
-links: {
-  postAuthor: {
-    forward: { on: 'posts', has: 'one', label: 'author' },
-    reverse: { on: 'profiles', has: 'many', label: 'authoredPosts' }
-  }
-}
-```
-
-### Relationship Types
-
-**One-to-One**
-
-```typescript
-profileUser: {
-  forward: { on: 'profiles', has: 'one', label: '$user' },
-  reverse: { on: '$users', has: 'one', label: 'profile' }
-}
-```
-
-**One-to-Many**
-
-```typescript
-postAuthor: {
-  forward: { on: 'posts', has: 'one', label: 'author' },
-  reverse: { on: 'profiles', has: 'many', label: 'authoredPosts' }
-}
-```
-
-**Many-to-Many**
-
-```typescript
-postsTags: {
-  forward: { on: 'posts', has: 'many', label: 'tags' },
-  reverse: { on: 'tags', has: 'many', label: 'posts' }
-}
-```
-
-### System Namespace Links
-
-Always link TO system namespaces in reverse:
-
-```typescript
-// ✅ Correct
-forward: { on: 'profiles', has: 'one', label: '$user' },
-reverse: { on: '$users', has: 'one', label: 'profile' }
-```
-
-### Cascade Delete
-
-```typescript
-postAuthor: {
-  forward: { on: 'posts', has: 'one', label: 'author', onDelete: 'cascade' },
-  reverse: { on: 'profiles', has: 'many', label: 'authoredPosts' }
-}
-```
-
-## Complete Example
-
-```typescript
-import { i } from "@instantdb/react-native";
-
-const _schema = i.schema({
-  entities: {
-    $users: i.entity({
-      email: i.string().unique().indexed(),
-    }),
-    profiles: i.entity({
-      nickname: i.string().unique(),
-      bio: i.string(),
-      createdAt: i.date().indexed(),
-    }),
-    posts: i.entity({
-      title: i.string(),
-      slug: i.string().unique().indexed(),
-      body: i.string(),
-      isPublished: i.boolean().indexed(),
-      publishedAt: i.date().indexed(),
-    }),
-    comments: i.entity({
-      body: i.string(),
-      createdAt: i.date().indexed(),
-    }),
-    tags: i.entity({
-      name: i.string().unique().indexed(),
-    }),
-  },
-  links: {
-    profileUser: {
-      forward: { on: "profiles", has: "one", label: "$user", onDelete: "cascade" },
-      reverse: { on: "$users", has: "one", label: "profile", onDelete: "cascade" },
-    },
-    postAuthor: {
-      forward: { on: "posts", has: "one", label: "author", onDelete: "cascade" },
-      reverse: { on: "profiles", has: "many", label: "authoredPosts" },
-    },
-    commentPost: {
-      forward: { on: "comments", has: "one", label: "post", onDelete: "cascade" },
-      reverse: { on: "posts", has: "many", label: "comments" },
-    },
-    commentAuthor: {
-      forward: { on: "comments", has: "one", label: "author", onDelete: "cascade" },
-      reverse: { on: "profiles", has: "many", label: "authoredComments" },
-    },
-    postsTags: {
-      forward: { on: "posts", has: "many", label: "tags" },
-      reverse: { on: "tags", has: "many", label: "posts" },
-    },
-  },
-});
-
-type _AppSchema = typeof _schema;
-interface AppSchema extends _AppSchema {}
-const schema: AppSchema = _schema;
-
-export type { AppSchema };
-export default schema;
-```
-
-## TypeScript Integration
-
-```typescript
-import { InstaQLEntity } from "@instantdb/react-native";
-import { AppSchema } from "../instant.schema";
-
-// Type-safe entities
-type Post = InstaQLEntity<AppSchema, "posts">;
-type PostWithAuthor = InstaQLEntity<AppSchema, "posts", { author: {} }>;
-
-function PostEditor({ post }: { post: Post }) {
-  return <h1>{post.title}</h1>;
-}
-```
-
-## Important: Do not use the same label for an attribute and a reference
-
-If you do this this will cause errors when you try to query the data. Make sure
-to use different labels for attributes and references.
-
-```typescript
-const _schema = i.schema({
-  entities: {
-    notes: i.entity({
-      title: i.string().indexed(),
-      content: i.string(),
-      // ❌ Wrong: `tags` is both an attribute and a reference
-      tags: i.json(),
-      isPinned: i.boolean().indexed(),
-      createdAt: i.date().indexed(),
-      updatedAt: i.date().indexed(),
-    }),
-    tags: i.entity({
-      name: i.string().unique().indexed(),
-      color: i.string(),
-    }),
-  },
-  links: {
-    notesTags: {
-      forward: { on: "notes", has: "many", label: "tags" },
-      reverse: { on: "tags", has: "many", label: "notes" },
-    },
-  },
-});
-```
-
-## Best Practices
-
-1. Index frequently queried attributes
-2. Use unique constraints for usernames, slugs
-3. Clear, descriptive link labels
-4. Set cascade delete for dependent relationships
-5. Use TypeScript utility types
-
-## Common Mistakes
-
-- Creating `$` prefixed namespaces
-- Not indexing query fields
-- Ambigious attribute and reference labels
-- Wrong system namespace link direction
-- Using non-indexed fields in queries/sorting
-
-# How to write permissions
-
-Define access controls using Google's CEL expression language.
-
-## Core Operations
-
-- **view**: Read access (queries)
-- **create**: Create new entities
-- **update**: Modify existing entities
-- **delete**: Remove entities
-
-## Default Behavior
-
-All permissions default to `true` (unrestricted).
-
-```typescript
-// These are equivalent:
-{} // Empty rules
-{ todos: { allow: {} } } // No rules specified
-{ todos: { allow: { view: "true", create: "true", update: "true", delete: "true" } } }
-```
-
-## Key Features
-
-### `$default` for Namespace Defaults
-
-```typescript
-{
-  todos: {
-    allow: {
-      $default: "false",      // Deny all by default
-      view: "auth.id != null" // Explicitly allow viewing
-    }
-  }
-}
-```
-
-### `auth` and `data` Objects
-
-- `auth`: Current authenticated user
-- `data`: Current entity being accessed
-
-```typescript
-{
-  todos: {
-    allow: {
-      view: "auth.id != null",
-      update: "auth.id == data.ownerId"
-    }
-  }
-}
-```
-
-### `bind` for Reusable Logic
-
-```typescript
-{
-  todos: {
-    allow: {
-      view: "isLoggedIn",
-      $default: "isOwner || isAdmin"
-    },
-    bind: [
-      "isLoggedIn", "auth.id != null",
-      "isOwner", "isLoggedIn && auth.id == data.ownerId",
-      "isAdmin", "isLoggedIn && auth.email in ['admin@example.com']"
-    ]
-  }
-}
-```
-
-### `data.ref` for Linked Data
-
-Returns CEL list - use `in` operator or index `[0]` for single values.
-
-```typescript
-// ✅ Correct
-"update": "auth.id in data.ref('post.author.id')"
-"view": "auth.id == data.ref('owner.id')[0]"
-"view": "size(data.ref('owner.id')) > 0"
-
-// ❌ Wrong
-"update": "auth.id == data.ref('post.author.id')"  // Always returns list
-"view": "data.ref('owner')"                        // Must specify attribute
-"view": "data.ref('owner.id') != null"            // Check against [] not null
-```
-
-### `auth.ref` for User's Linked Data
-
-Must use `$user` prefix.
-
-```typescript
-// ✅ Correct
-"create": "'admin' in auth.ref('$user.role.type')"
-"create": "auth.ref('$user.role.type')[0] == 'admin'"
-
-// ❌ Wrong
-"create": "'admin' in auth.ref('role.type')"  // Missing $user prefix
-```
-
-### `newData` for Update Comparisons
-
-```typescript
-{
-  posts: {
-    allow: {
-      // Authors can update but not change published status
-      update: "auth.id == data.authorId && newData.isPublished == data.isPublished";
-    }
-  }
-}
-```
-
-### `ruleParams` for Non-Auth Permissions
-
-```typescript
-// app/page.tsx
-const docId = new URLSearchParams(window.location.search).get("docId");
-const { data } = db.useQuery({ docs: {} }, { ruleParams: { docId } });
-
-db.transact(
-  db.tx.docs[docId].ruleParams({ docId }).update({ title: 'eat' })
-);
-
-// instant.perms.ts
-{
-  documents: {
-    allow: {
-      view: "data.id == ruleParams.docId",
-      update: "data.id == ruleParams.docId"
-    }
-  }
-}
-```
-
-## Complete Examples
-
-### Blog Platform
-
-```typescript
-// instant.perms.ts
-{
-  posts: {
-    allow: {
-      view: "data.isPublished || isAuthor",
-      create: "auth.id != null && isAuthor",
-      update: "isAuthor || isAdmin",
-      delete: "isAuthor || isAdmin"
-    },
-    bind: [
-      "isAuthor", "auth.id == data.authorId",
-      "isAdmin", "auth.ref('$user.role')[0] == 'admin'"
-    ]
-  },
-  comments: {
-    allow: {
-      view: "true",
-      create: "isCommentAuthor",
-      update: "isCommentAuthor",
-      delete: "isCommentAuthor || isPostAuthor || isAdmin"
-    },
-    bind: [
-      "isLoggedIn", "auth.id != null",
-      "isPostAuthor", "isLoggedIn && auth.id == data.ref('post.authorId')[0]",
-      "isCommentAuthor", "isLoggedIn && auth.id == data.authorId",
-      "isAdmin", "auth.ref('$user.role')[0] == 'admin'"
-    ]
-  }
-}
-```
-
-### Todo App
-
-```typescript
-// instant.perms.ts
-{
-  todos: {
-    allow: {
-      view: "isOwner || isShared",
-      create: "isOwner",
-      update: "isOwner || (isShared && data.ownerId == newData.ownerId)",
-      delete: "isOwner"
-    },
-    bind: [
-      "isLoggedIn", "auth.id != null",
-      "isOwner", "isLoggedIn && auth.id == data.ownerId",
-      "isShared", "isLoggedIn && auth.id in data.ref('sharedWith.id')"
-    ]
-  },
-  lists: {
-    allow: {
-      $default: "isOwner",
-      view: "isOwner || isCollaborator"
-    },
-    bind: [
-      "isLoggedIn", "auth.id != null",
-      "isOwner", "isLoggedIn && auth.id == data.ownerId",
-      "isCollaborator", "isLoggedIn && auth.id in data.ref('collaborators.id')"
-    ]
-  }
-}
-```
-
-## Common Mistakes
-
-- Not using `data.ref` for linked data
-- Missing attribute in `data.ref('owner')` → `data.ref('owner.id')`
-- Using `==` with lists instead of `in` operator
-- Missing `$user` prefix with `auth.ref`
-- Checking `data.ref` against `null` instead of `[]`
-- Using `newData.ref` (doesn't exist)
-- Non-literal strings in ref: `data.ref(var + '.id')` → `data.ref('team.id')`
-
-# How to get the current user
-
-You can get the current user by using the `useAuth` hook.
-
-```typescript
-const { isLoading, user, error } = db.useAuth();
-
-if (isLoading) return <div>Loading...</div>;
-if (error) return <div>Error: {error.message}</div>;
-if (user) return <AuthenticatedApp user={user} />;
-return <UnauthenticatedApp />;
-```
-
-# How to implenent authentication
-
-Instant supports magic code authentication. There is no built-in username/password authentication.
-
-## Core concepts
-
-1. User enters email
-2. InstantDB sends verification code
-3. User enters code
-4. Authentication complete
-
-## Complete Example
-
-This uses Nativewind. If your project doesn't use Nativewind, you'll have to write the classes manually.
-
-```typescript
-// instant.schema.ts
-import { i } from "@instantdb/react-native";
-
-const _schema = i.schema({
-  entities: {
-    $users: i.entity({
-      email: i.string().unique().indexed(),
-    }),
-  },
-});
-
+// This helps Typescript display nicer intellisense
 type _AppSchema = typeof _schema;
 interface AppSchema extends _AppSchema {}
 const schema: AppSchema = _schema;
@@ -1101,145 +145,746 @@ const schema: AppSchema = _schema;
 export type { AppSchema };
 export default schema;
 
-// lib/db.ts
-import { init } from "@instantdb/react-native";
-import schema from "./instant.schema";
 
-export const db = init({
-  appId: "your-app-id",
-  schema,
-});
-
-// src/app/_layout.tsx
-import { View, Text } from "react-native";
-import { db } from "../lib/db";
-
-export default function Layout() {
-  const { isLoading, error, user } = db.useAuth();
-
-  if (isLoading) return null;
-  if (error) return <Text>{error.message}</Text>;
-  if (!user) return <SignIn />;
-
-  return (
-    <View>
-      <Text>Your logged in app</Text>
-    </View>
-  );
-}
-
-// src/components/SignIn.tsx
-import React, { useState } from "react";
+/* FILE: app/page.tsx */
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  TouchableWithoutFeedback,
-  Keyboard,
-  TouchableOpacity,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { db } from "../lib/db";
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+} from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { id, lookup, InstaQLEntity } from '@instantdb/react-native';
+import db from './lib/db';
+import schema from './instant.schema';
 
-export default function SignIn() {
-  const [sentEmail, setSentEmail] = useState("");
+// Instant utility types for query results
+type PostsWithProfile = InstaQLEntity<
+  typeof schema,
+  'posts',
+  { author: { avatar: {} } }
+>;
+
+function randomHandle() {
+  const adjectives = ['Quick', 'Lazy', 'Happy', 'Sad', 'Bright', 'Dark'];
+  const nouns = ['Fox', 'Dog', 'Cat', 'Bird', 'Fish', 'Mouse'];
+  const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+  const randomSuffix = Math.floor(Math.random() * 9000) + 1000;
+  return `${randomAdjective}${randomNoun}${randomSuffix}`;
+}
+
+// Database operations
+async function createProfile(userId: string): Promise<void> {
+  await db.transact(
+    db.tx.profiles[userId]
+      .update({ handle: randomHandle() })
+      .link({ user: userId })
+  );
+}
+
+function addPost(text: string, authorId: string): void {
+  db.transact(
+    db.tx.posts[id()]
+      .update({ text, createdAt: Date.now() })
+      .link({ author: authorId })
+  );
+}
+
+function deletePost(postId: string): void {
+  db.transact(db.tx.posts[postId].delete());
+}
+
+// Ephemeral helpers
+// ---------
+function makeShout(text: string) {
+  const { width, height } = Dimensions.get('window');
+  return {
+    id: Date.now().toString(),
+    text,
+    x: Math.random() * (width - 150), // Account for safe area
+    y: Math.random() * (height - 300),
+    angle: (Math.random() - 0.5) * 30,
+    size: Math.random() * 20 + 18,
+    opacity: new Animated.Value(1),
+  };
+}
+
+// Instant query Hooks
+// ---------
+function useProfile() {
+  // CRITICAL: useUser can only be used inside a db.SignedIn component
+  const user = db.useUser();
+  const { data, isLoading, error } = db.useQuery({
+    profiles: {
+      $: { where: { 'user.id': user.id } },
+      avatar: {},
+    },
+  });
+  const profile = data?.profiles?.[0];
+  return { profile, isLoading, error };
+}
+
+function useRequiredProfile() {
+  const { profile } = useProfile();
+  if (!profile) {
+    throw new Error('useRequiredProfile must be used inside EnsureProfile');
+  }
+  return profile;
+}
+
+function usePosts(pageNumber: number, pageSize: number) {
+  const { isLoading, error, data } = db.useQuery({
+    posts: {
+      $: {
+        order: { createdAt: 'desc' },
+        limit: pageSize,
+        offset: (pageNumber - 1) * pageSize,
+      },
+      author: { avatar: {} },
+    },
+  });
+  return { isLoading, error, posts: (data?.posts || []) as PostsWithProfile[] };
+}
+
+// Auth Components
+// ---------
+function Login() {
+  const [sentEmail, setSentEmail] = useState<string>('');
 
   return (
-    <SafeAreaView className="flex-1">
-      <TouchableWithoutFeedback accessible={false} onPress={Keyboard.dismiss}>
-        <View className="flex-1">
-          <KeyboardAvoidingView className="p-4" behavior={Platform.OS === "ios" ? "padding" : undefined}>
-            {!sentEmail ? <EmailStep onSendEmail={setSentEmail} /> : <CodeStep sentEmail={sentEmail} />}
-          </KeyboardAvoidingView>
-        </View>
-      </TouchableWithoutFeedback>
-    </SafeAreaView>
+    <View style={styles.loginContainer}>
+      <View style={styles.loginBox}>
+        {!sentEmail ? (
+          <EmailStep onSendEmail={setSentEmail} />
+        ) : (
+          <CodeStep sentEmail={sentEmail} />
+        )}
+      </View>
+    </View>
   );
 }
 
 function EmailStep({ onSendEmail }: { onSendEmail: (email: string) => void }) {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState<string>('');
 
   const handleSubmit = () => {
-    if (!email.trim()) return;
-
-    onSendEmail(email.trim());
-
-    db.auth.sendMagicCode({ email: email.trim() }).catch((err) => {
-      Alert.alert("Uh oh: " + err.body?.message);
-      onSendEmail("");
+    if (!email) return;
+    onSendEmail(email);
+    db.auth.sendMagicCode({ email }).catch((err) => {
+      Alert.alert('Error', err.body?.message || 'Something went wrong');
+      onSendEmail('');
     });
   };
 
   return (
-    <View>
-      <Text className="text-4xl font-bold mb-4">👋</Text>
-      <Text className="text-2xl font-bold mb-4">Let’s log you in</Text>
-      <Text className="text-gray-700 mb-4">
-        Enter your email and we’ll send you a verification code (we’ll create an account if you don’t have one).
+    <View style={styles.formContainer}>
+      <Text style={styles.title}>Instant Demo App</Text>
+      <Text style={styles.description}>
+        This is a demo app for InstantDB. Enter your email to receive a verification code.
       </Text>
       <TextInput
-        autoFocus
+        style={styles.input}
+        placeholder="Enter your email"
         value={email}
         onChangeText={setEmail}
-        textContentType="emailAddress"
         keyboardType="email-address"
-        autoComplete="email"
         autoCapitalize="none"
-        placeholder="you@example.com"
-        className="border border-gray-300 rounded-md px-3 py-2 mb-4"
       />
-      <TouchableOpacity onPress={handleSubmit} className="px-4 py-2 rounded-md bg-blue-600 flex-row justify-center">
-        <Text className="text-white font-bold">Send code</Text>
+      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+        <Text style={styles.buttonText}>Send Code</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-/* --- Step 2: verify code --- */
 function CodeStep({ sentEmail }: { sentEmail: string }) {
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState<string>('');
 
-  const handleVerify = () => {
-    if (!code.trim()) return;
-
-    db.auth.signInWithMagicCode({ email: sentEmail, code: code.trim() }).catch((err) => {
-      alert("Uh oh: " + err.body?.message);
-      setCode("");
+  const handleSubmit = (): void => {
+    if (!code) return;
+    db.auth.signInWithMagicCode({ email: sentEmail, code }).catch((err) => {
+      setCode('');
+      Alert.alert('Error', err.body?.message || 'Invalid code');
     });
   };
 
   return (
-    <View className="space-y-4">
-      <Text className="text-4xl font-bold mb-4">✉️</Text>
-      <Text className="text-2xl font-bold mb-4">Enter your code</Text>
-      <Text className="text-gray-700 mb-4">
-        We emailed&nbsp;
-        <Text className="font-semibold">{sentEmail}</Text>. Paste the six-digit code here.
+    <View style={styles.formContainer}>
+      <Text style={styles.title}>Enter your code</Text>
+      <Text style={styles.description}>
+        We sent an email to <Text style={styles.bold}>{sentEmail}</Text>
       </Text>
       <TextInput
-        autoFocus
+        style={styles.input}
+        placeholder="123456..."
         value={code}
         onChangeText={setCode}
-        placeholder="123456"
-        keyboardType="number-pad"
-        maxLength={6}
-        className="border border-gray-300 rounded-md px-3 py-2 mb-4"
+        keyboardType="numeric"
       />
-
-      <TouchableOpacity onPress={handleVerify} className="px-4 py-2 rounded-md bg-blue-600 flex-row justify-center">
-        <Text className="text-white font-bold">Verify code</Text>
+      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+        <Text style={styles.buttonText}>Verify Code</Text>
       </TouchableOpacity>
     </View>
   );
 }
+
+function EnsureProfile({ children }: { children: React.ReactNode }) {
+  const user = db.useUser();
+  const { isLoading, profile, error } = useProfile();
+
+  useEffect(() => {
+    if (!isLoading && !profile) {
+      createProfile(user.id);
+    }
+  }, [isLoading, profile, user.id]);
+
+  if (isLoading) return <ActivityIndicator size="large" style={styles.loader} />;
+  if (error) return <Text style={styles.error}>Profile error: {error.message}</Text>;
+  if (!profile) return <ActivityIndicator size="large" style={styles.loader} />;
+
+  return <>{children}</>;
+}
+
+// Use the room for presence and topics
+const room = db.room('todos', 'main');
+
+// App Components
+// ---------
+function Main() {
+  const insets = useSafeAreaInsets();
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const pageSize = 5;
+  const { isLoading, error, posts } = usePosts(pageNumber, pageSize);
+  const { peers } = db.rooms.usePresence(room);
+  const numUsers = 1 + Object.keys(peers).length;
+
+  if (isLoading) return <ActivityIndicator size="large" style={styles.loader} />;
+  if (error) return <Text style={styles.error}>Error: {error.message}</Text>;
+
+  return (
+    <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>
+      <ScrollView style={styles.mainContainer}>
+        <View style={styles.contentContainer}>
+          <View style={styles.header}>
+            <ProfileAvatar />
+            <TouchableOpacity onPress={() => db.auth.signOut()}>
+              <Text style={styles.signOutText}>Sign out</Text>
+            </TouchableOpacity>
+          </View>
+
+          <PostForm />
+          <PostList posts={posts} />
+
+          <View style={styles.pagination}>
+            <TouchableOpacity
+              style={[styles.pageButton, pageNumber <= 1 && styles.disabledButton]}
+              onPress={() => setPageNumber(pageNumber - 1)}
+              disabled={pageNumber <= 1}
+            >
+              <Text style={styles.pageButtonText}>Previous</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.pageButton, posts.length < pageSize && styles.disabledButton]}
+              onPress={() => setPageNumber(pageNumber + 1)}
+              disabled={posts.length < pageSize}
+            >
+              <Text style={styles.pageButtonText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.onlineCount}>
+            {numUsers} user{numUsers > 1 ? 's' : ''} online
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function ProfileAvatar() {
+  const user = db.useUser();
+  const profile = useRequiredProfile();
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const avatarPath = `${user.id}/avatar`;
+
+  const handleAvatarUpload = async (): Promise<void> => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Sorry, we need camera roll permissions!');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      setIsUploading(true);
+      try {
+        const blob = await fetch(result.assets[0].uri!).then(res => res.blob());
+        const { data } = await db.storage.uploadFile(avatarPath, blob);
+        await db.transact(db.tx.profiles[profile.id].link({ avatar: data.id }));
+      } catch (error) {
+        console.error('Upload failed:', error);
+        Alert.alert('Upload failed', 'Please try again');
+      }
+      setIsUploading(false);
+    }
+  };
+
+  const handleAvatarDelete = async (): Promise<void> => {
+    if (!profile.avatar) return;
+    db.transact(db.tx.$files[lookup('path', avatarPath)].delete());
+  };
+
+  return (
+    <View style={styles.avatarContainer}>
+      <TouchableOpacity onPress={handleAvatarUpload}>
+        {profile.avatar ? (
+          <Image source={{ uri: profile.avatar.url }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarText}>
+              {profile.handle[0].toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {isUploading && (
+          <View style={styles.uploadingOverlay}>
+            <ActivityIndicator color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+      <View style={styles.profileInfo}>
+        <Text style={styles.handle}>handle: {profile.handle}</Text>
+        <Text style={styles.email}>email: {user.email}</Text>
+        <TouchableOpacity
+          onPress={handleAvatarDelete}
+          disabled={!profile.avatar || isUploading}
+        >
+          <Text style={[styles.deleteText, (!profile.avatar || isUploading) && styles.disabledText]}>
+            Delete Avatar
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+function PostForm() {
+  const user = db.useUser();
+  const [shouts, setShouts] = useState<Array<{
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    angle: number;
+    size: number;
+    opacity: Animated.Value;
+  }>>([]);
+  const [value, setValue] = useState('');
+  const publishShout = db.rooms.usePublishTopic(room, 'shout');
+
+  const handleSubmit = (action: string) => {
+    if (!value.trim()) return;
+    if (action === 'post') {
+      addPost(value, user?.id);
+    } else {
+      const params = makeShout(value);
+      addShout(params);
+      publishShout(params);
+    }
+    setValue('');
+  };
+
+  const addShout = (shout: ReturnType<typeof makeShout>) => {
+    setShouts(prev => [...prev, shout]);
+
+    Animated.timing(shout.opacity, {
+      toValue: 0,
+      duration: 2000,
+      delay: 100,
+      useNativeDriver: true,
+    }).start(() => {
+      setShouts(prev => prev.filter(s => s.id !== shout.id));
+    });
+  }
+
+  return (
+    <View style={styles.postFormContainer}>
+      <TextInput
+        style={styles.postInput}
+        placeholder="What's on your mind?"
+        value={value}
+        onChangeText={setValue}
+      />
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleSubmit('post')}>
+          <Text style={styles.actionButtonText}>Add to wall</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={() => handleSubmit('shout')}>
+          <Text style={styles.actionButtonText}>Shout to void</Text>
+        </TouchableOpacity>
+      </View>
+      <>
+        {shouts.map(shout => (
+          <Animated.Text
+            key={shout.id}
+            style={{
+              position: 'absolute',
+              left: shout.x,
+              top: shout.y,
+              fontSize: shout.size,
+              fontWeight: 'bold',
+              opacity: shout.opacity,
+              transform: [{ rotate: `${shout.angle}deg` }],
+            }}
+          >
+            {shout.text}
+          </Animated.Text>
+        ))}
+      </>
+    </View>
+  );
+}
+
+function PostList({ posts }: { posts: PostsWithProfile[] }) {
+  const user = db.useUser();
+
+  return (
+    <View style={styles.postList}>
+      {posts.map((post) => (
+        <View key={post.id} style={styles.postCard}>
+          <View style={styles.postHeader}>
+            {post.author?.avatar ? (
+              <Image source={{ uri: post.author.avatar.url }} style={styles.postAvatar} />
+            ) : (
+              <View style={styles.postAvatarPlaceholder}>
+                <Text style={styles.postAvatarText}>
+                  {post.author?.handle[0].toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.postContent}>
+              <View style={styles.postMeta}>
+                <View>
+                  <Text style={styles.postAuthor}>
+                    {post.author?.handle || 'Unknown'}
+                  </Text>
+                  <Text style={styles.postDate}>
+                    {new Date(post.createdAt).toLocaleString()}
+                  </Text>
+                </View>
+                {post.author?.id === user?.id && (
+                  <TouchableOpacity onPress={() => deletePost(post.id)}>
+                    <Text style={styles.deletePost}>×</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={styles.postText}>{post.text}</Text>
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function App() {
+  return (
+    <SafeAreaProvider>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <db.SignedIn>
+          <EnsureProfile>
+            <Main />
+          </EnsureProfile>
+        </db.SignedIn>
+        <db.SignedOut>
+          <Login />
+        </db.SignedOut>
+      </KeyboardAvoidingView>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  error: {
+    color: 'red',
+    padding: 16,
+    textAlign: 'center',
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loginBox: {
+    width: '100%',
+    maxWidth: 400,
+  },
+  formContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  description: {
+    color: '#666',
+    marginBottom: 16,
+  },
+  bold: {
+    fontWeight: 'bold',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  button: {
+    backgroundColor: '#2563eb',
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  mainContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  signOutText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  avatarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#333',
+  },
+  avatarPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#333',
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInfo: {
+    marginLeft: 16,
+  },
+  handle: {
+    fontWeight: '500',
+  },
+  email: {
+    fontSize: 14,
+    color: '#666',
+  },
+  deleteText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  disabledText: {
+    color: '#ccc',
+  },
+  postFormContainer: {
+    marginBottom: 20,
+  },
+  postInput: {
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#333',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    minHeight: 60,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#333',
+    borderRadius: 24,
+  },
+  actionButtonText: {
+    fontWeight: '500',
+  },
+  postList: {
+    gap: 12,
+  },
+  postCard: {
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#333',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  postHeader: {
+    flexDirection: 'row',
+  },
+  postAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#333',
+  },
+  postAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#333',
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postAvatarText: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  postContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  postMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  postAuthor: {
+    fontWeight: '500',
+  },
+  postDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  deletePost: {
+    fontSize: 24,
+    color: '#999',
+  },
+  postText: {
+    marginTop: 8,
+    color: '#333',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  pageButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#e5e5e5',
+    borderRadius: 4,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  pageButtonText: {
+    color: '#333',
+  },
+  onlineCount: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#666',
+    marginTop: 16,
+  },
+});
+
+export default App;
 ```
 
-### Best Practices
+# Documentation
 
-1. **Clear Error Handling** - Helpful error messages
-2. **Loading States** - Show indicators during async ops
-3. **Resend Functionality** - Allow new code requests
+The bullets below are links to the InstantDB documentation. They provide detailed information on how to use different features of InstantDB. Each line follows the pattern of
+
+- [TOPIC](URL): Description of the topic.
+
+Fetch the URL for a topic to learn more about it.
+
+- [Common mistakes](https://instantdb.com/docs/common-mistakes.md): Common mistakes when working with Instant
+- [Initializing Instant](https://instantdb.com/docs/init.md): How to integrate Instant with your app.
+- [Modeling data](https://instantdb.com/docs/modeling-data.md): How to model data with Instant's schema.
+- [Writing data](https://instantdb.com/docs/instaml.md): How to write data with Instant using InstaML.
+- [Reading data](https://instantdb.com/docs/instaql.md): How to read data with Instant using InstaQL.
+- [Instant on the Backend](https://instantdb.com/docs/backend.md): How to use Instant on the server with the Admin SDK.
+- [Patterns](https://instantdb.com/docs/patterns.md): Common patterns for working with InstantDB.
+- [Auth](https://instantdb.com/docs/auth.md): Instant supports magic code, OAuth, Clerk, and custom auth.
+- [Auth](https://instantdb.com/docs/auth/magic-codes.md): How to add magic code auth to your Instant app.
+- [Managing users](https://instantdb.com/docs/users.md): How to manage users in your Instant app.
+- [Presence, Cursors, and Activity](https://instantdb.com/docs/presence-and-topics.md): How to add ephemeral features like presence and cursors to your Instant app.
+- [Instant CLI](https://instantdb.com/docs/cli.md): How to use the Instant CLI to manage schema.
+- [Storage](https://instantdb.com/docs/storage.md): How to upload and serve files with Instant.

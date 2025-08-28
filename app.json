@@ -9,10 +9,24 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bidah.vibecode-app-next"
+      "bundleIdentifier": "com.bidah.vibecode-app-next",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow VibeCode to access your camera. This will be used testing features that require camera access. For example, you can use the camera to take a photo and save it to your photo library.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_MEDIA_LOCATION"
+      ]
     },
     "plugins": [
       "expo-font",
@@ -21,13 +35,6 @@
       "expo-mail-composer",
       "expo-secure-store",
       "expo-sqlite",
-      // [
-      //   "expo-calendar",
-      //   {
-      //     "calendarPermission": "Allow VibeCode to access your calendar. This will be used testing features that require calendar access. For example, you can create and display events in your calendar.",
-      //     "remindersPermission": "Allow VibeCode to access your reminders. This will be used testing features that require reminders access. For example, you can create and display reminders in your reminders list."
-      //   }
-      // ],
       [
         "expo-contacts",
         {
@@ -75,6 +82,11 @@
           "projectId": "ab3ad25f-6cf8-4216-97f2-d4afe13c645b"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "6f1c5589-c7b0-432b-bbee-913a7013bfa2"
+      }
+    }
   }
 }
