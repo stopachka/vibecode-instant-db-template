@@ -1,36 +1,43 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import { Stack } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
-import "react-native-reanimated";
-import "react-native-get-random-values";
+import db from "../lib/db";
+import { SplashScreen, Tabs } from "expo-router";
+import { Text } from "react-native";
+import SignIn from "../auth/SignIn";
+import ScaleButton from "../components/ScaleButton";
+import AuthorizedContainer from "../auth/AuthorizedContainer";
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+SplashScreen.preventAutoHideAsync();
 
+export default function Layout() {
+  const { isLoading, error, user } = db.useAuth();
+
+  if (isLoading) return null;
+
+  if (error) <Text>{error.message}</Text>;
+
+  if (!user) return <SignIn />;
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen 
-          name="note-detail" 
-          options={{ 
-            headerShown: true,
-            title: "Note Details",
-            presentation: "card"
-          }} 
+    <AuthorizedContainer>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarButton: ScaleButton,
+        }}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Wall",
+            tabBarIcon: () => <Text>💬</Text>,
+          }}
         />
-        <Stack.Screen 
-          name="add-comment" 
-          options={{ 
-            headerShown: true,
-            title: "Add Comment",
-            presentation: "modal"
-          }} 
+        <Tabs.Screen
+          name="profile"
+          options={{
+            tabBarIcon: () => <Text>🎫</Text>,
+            title: "Profile",
+          }}
         />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+      </Tabs>
+    </AuthorizedContainer>
   );
 }
